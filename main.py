@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict
+from typing import Optional, Dict ,List
 from datetime import datetime, timedelta
 import jwt
+from book import Book, Borrowing, borrow_book, create_book, delete_book, get_book, recommend_books, return_book, update_book
 
 app = FastAPI()
 
@@ -67,6 +68,68 @@ def login_user(user_auth: UserAuth):
         raise HTTPException(status_code=401, detail="Authentication failed")
     access_token = create_access_token(data={"sub": user_auth.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+# Endpoint to create a new book (POST /books)
+@app.post("/books/", response_model=Book)
+def create_new_book(book: Book):
+    return create_book(book)
+
+
+# Endpoint to retrieve a book by ISBN (GET /books/{isbn})
+@app.get("/books/{isbn}", response_model=Book)
+def get_book_by_isbn(isbn: str):
+    return get_book(isbn)
+
+# Endpoint to update book details by ISBN (PUT /books/{isbn})
+@app.put("/books/{isbn}", response_model=Book)
+def update_book_by_isbn(isbn: str, updated_book: Book):
+    return update_book(isbn, updated_book)
+
+# Endpoint to delete a book by ISBN (DELETE /books/{isbn})
+@app.delete("/books/{isbn}", response_model=Book)
+def delete_book_by_isbn(isbn: str):
+    return delete_book(isbn)
+
+
+# Endpoint to borrow a book (POST /borrow)
+@app.post("/borrow/", response_model=Borrowing)
+def borrow_a_book(username: str, book_isbn: str):
+    return borrow_book(username, book_isbn)
+
+# Endpoint to return a book (POST /return)
+@app.post("/return/", response_model=Borrowing)
+def return_a_book(username: str, book_isbn: str):
+    return return_book(username, book_isbn)
+
+
+# Endpoint to search for books by title, author, or ISBN (GET /search)
+@app.get("/search/", response_model=List[Book])
+def search_books(
+    title: str = None,
+    author: str = None,
+    isbn: str = None,
+):
+    results = []
+
+    for book in books_db.values():
+        if (
+            (title is None or title.lower() in book.title.lower())
+            and (author is None or author.lower() in book.author.lower())
+            and (isbn is None or isbn == book.isbn)
+        ):
+            results.append(book)
+
+    if not results:
+        raise HTTPException(status_code=404, detail="No matching books found")
+
+    return results
+
+
+# Endpoint to get book recommendations for a user based on genres or authors (GET /recommendations/{username})
+@app.get("/recommendations/{username}", response_model=List[Book])
+def get_recommendations(username: str, by: str = "genres"):
+    recommended_books = recommend_books(username, by)
+    return recommended_books
 
 if __name__ == "__main__":
     import uvicorn
